@@ -1,0 +1,255 @@
+* Set memory and maximum variable limits
+set mem 500m 
+set more off
+
+* Table 1 
+
+    * OLS Regressions
+    
+    reg cash treatment if sample == "ALP", robust
+    reg cash treatment if sample == "KP", robust
+    
+    preserve
+
+    * Only keep observations with checking or savings account
+    keep if have_checking_savings == 1
+    
+    * Run regressions on the filtered data
+    reg balance_checking_savings treatment if sample == "ALP", robust
+    reg balance_checking_savings treatment if sample == "KP", robust
+
+    restore
+
+    reg total_expenditures treatment if sample == "ALP", robust
+    reg total_expenditures treatment if sample == "KP", robust
+* Quantile Regressions
+
+    qreg cash treatment if sample == "ALP", quantile(0.5)
+    qreg cash treatment if sample == "KP", quantile(0.5)
+	
+	preserve
+	* Only keep observations with checking or savings account
+	keep if have_checking_savings == 1
+* Quantile Regressions
+	qreg balance_checking_savings treatment if sample == "ALP"	, quantile(0.5)		
+	qreg balance_checking_savings treatment if sample == "KP"	, quantile(0.5)
+
+	restore
+	* Quantile Regressions				
+	qreg total_expenditures	 treatment if sample == "ALP", quantile(0.5)
+	qreg total_expenditures  treatment if sample == "KP"	, quantile(0.5)
+	
+	* Wilcoxon Rank-sum Test
+	
+	ranksum cash if sample == "ALP", by(treatment)
+	ranksum cash if sample == "KP",  by(treatment)
+	
+	preserve
+	
+		keep if have_checking_savings == 1
+	
+	ranksum balance_checking_savings  if sample == "ALP", by(treatment)
+	ranksum balance_checking_savings  if sample == "KP",  by(treatment)
+	
+	restore
+	
+	ranksum total_expenditures  if sample == "ALP", by(treatment)
+	ranksum total_expenditures  if sample == "KP",  by(treatment)
+		
+	
+* Table 2 
+
+    * Quantile regression for different groups in the ALP and KP samples
+    
+    foreach group in onepayment hardship livecheckbycheck income_less20k {
+        
+        qreg total_expenditures treatment if `group' == 1 & sample == "ALP"
+        qreg total_expenditures treatment if `group' == 1 & sample == "KP"
+    
+    }
+    
+    foreach group in caloric_crunch liquidity_constrained  {
+        
+        qreg total_expenditures treatment if `group' == 1 & sample == "KP"
+    
+    }
+	* Table 3
+
+	* Monetary 
+	
+	preserve
+	
+		keep prim_key CTB_SR* CTB_delay* CTB_interest* CTB_immediate* treatment
+		drop if CTB_SR1 == . | CTB_SR2 == . | CTB_SR3 == . | CTB_SR4 == . | CTB_SR5 == . | CTB_SR6 == . | CTB_SR7 == . | CTB_SR8 == . | CTB_SR9 == . | CTB_SR10 == . | CTB_SR11 == . | CTB_SR12 == .
+
+		reshape long CTB_SR CTB_delay CTB_interest CTB_immediate, i(prim_key) j(game)
+	
+		gen interaction_immediate 	= CTB_immediate * treatment
+		gen interaction_delay     	= CTB_delay		* treatment
+		gen interaction_interest	= CTB_interest	* treatment
+	
+		reg CTB_SR interaction_immediate interaction_interest interaction_delay treatment CTB_immediate CTB_interest CTB_delay, cluster(prim_key)
+
+	restore
+	
+	
+	*Costly Effort 
+	
+	preserve
+
+		keep prim_key lb_DR_effort* ub_DR_effort* treatment
+	
+		reshape long lb_DR_effort ub_DR_effort, i(prim_key) j(future)
+	
+		gen immediate = 1 - future
+		drop future	
+		gen interaction = treatment * immediate
+	
+		intreg lb_DR_effort ub_DR_effort interaction treatment immediate, cluster(prim_key)
+
+	restore	
+	
+	*Table 4
+	
+* Study 1
+	intreg lb_CRRA_param ub_CRRA_param treatment, robust	
+* Study 2	
+	reg risk_aversion treatment 	if sample == "KP", robust
+
+		
+* Table 5 
+
+    * Consistency in Intertemporal Choices about Money
+    preserve
+    
+        * Drop observations with missing values
+        drop if CTB_SR1 == . | CTB_SR2 == . | CTB_SR3 == . | CTB_SR4 == . | CTB_SR5 == . | CTB_SR6 == . | CTB_SR7 == . | CTB_SR8 == . | CTB_SR9 == . | CTB_SR10 == . | CTB_SR11 == . | CTB_SR12 == .
+        
+        * Keep relevant consistency variables and treatment
+        keep prim_key CTB_consistency* treatment
+        
+        * Reshape for long format and create dummy variables for trials
+        reshape long CTB_consistency, i(prim_key) j(trial)
+        qui tab trial, gen(Dtrial)
+        drop Dtrial1
+        
+        * Run regression with clustered standard errors
+        reg CTB_consistency treatment Dtrial*, cluster(prim_key)
+    
+    restore
+
+    * Consistency in Intertemporal Choices about Effort
+    preserve
+    
+        * Drop observations with missing effort variables
+        drop if effort1 == . | effort2 == . | effort3 == . | effort4 == . | effort5 == . | effort6 == . | effort7 == . | effort8 == . | effort9 == . | effort10 == .
+        
+        * Keep relevant effort consistency variables and treatment
+        keep prim_key effort_consistency* treatment
+        
+        * Reshape for long format and create dummy variables for trials
+        reshape long effort_consistency, i(prim_key) j(trial)
+        qui tab trial, gen(Dtrial)
+        drop Dtrial1
+        
+        * Run regression with clustered standard errors
+        reg effort_consistency treatment Dtrial*, cluster(prim_key)
+    
+    restore
+
+    * GARP Violations in Study 2
+    reg CCEI_GARP treatment, robust
+    
+    * GARP + FOSD Violations in Study 2
+    reg CCEI_GARP_FOSD treatment, robust
+* Table 6
+
+    * Creating temporary files for analysis
+    tempfile flanker
+    tempfile s
+* Table 6
+
+    * Flanker Task for ALP sample
+    preserve
+    
+        * Keep relevant variables and filter for ALP sample
+        keep if sample == "ALP"
+        keep prim_key flanker_lntime* flanker_correct* treatment onepayment hardship livecheckbycheck income_less20k IHS_total_expenditures
+        renpfix flanker_
+        summ
+        
+        * Reshape data for long format and create dummy variables for trials
+        reshape long correct lntime, i(prim_key) j(trial)
+        qui tab trial, gen(Dtrial)
+        drop Dtrial1
+        
+        * Run regressions for lntime and correct responses with clustered standard errors
+        reg lntime treatment Dtrial*, cluster(prim_key)
+        reg correct treatment Dtrial*, cluster(prim_key)
+        
+        * Create variable for all observations and save
+        gen all = 1
+        save "`flanker'", replace
+
+    restore
+
+    * Numerical Stroop Task for KP sample
+    preserve
+    
+        * Keep relevant variables and filter for KP sample
+        keep if sample == "KP"
+        keep prim_key stroop_lntime* stroop_correct* treatment onepayment hardship caloric_crunch liquidity_constrained livecheckbycheck income_less20k IHS_total_expenditures
+        renpfix stroop_
+        
+        * Reshape data for long format and create dummy variables for trials
+        reshape long correct lntime, i(prim_key) j(trial)
+        qui tab trial, gen(Dtrial)
+        drop Dtrial1
+        
+        * Run regressions for lntime and correct responses with clustered standard errors
+        reg lntime treatment Dtrial*, cluster(prim_key)
+        reg correct treatment Dtrial*, cluster(prim_key)
+        
+        * Create variable for all observations and save
+        gen all = 1
+     restore
+	
+	*Working Memory (Study 1)
+	reg working_memory treatment, robust	
+	*Cognitive Reflection Test (Study 1)
+	reg CRT treatment, robust
+	
+	*Table 7 
+	
+	* Flanker
+	use	"`flanker'", clear
+	keep if  IHS_total_expenditures ~= . &  IHS_total_expenditures ~= .e
+	*ITT	
+	reg lntime 					treatment Dtrial*,  cluster(prim_key)	
+	*First Stage
+	reg IHS_total_expenditures 	treatment if trial == 1, robust
+	* 2SLS
+	ivregress 2sls lntime Dtrial* (IHS_total_expenditures = treatment),  cluster(prim_key)	
+
+
+	* Numerical Stroop 
+	use	"`stroop'", clear
+	keep if  IHS_total_expenditures ~= . &  IHS_total_expenditures ~= .e
+	* ITT
+	reg lntime 					treatment Dtrial*,  cluster(prim_key)
+	* First Stage
+	reg IHS_total_expenditures 	treatment if trial == 1, robust		
+  	*2SLS
+	ivregress 2sls lntime Dtrial* (IHS_total_expenditures = treatment),  cluster(prim_key)	
+
+* Get a list of only numeric variables
+ds, has(type numeric)
+
+* Loop through each numeric variable and count zeros
+foreach var of varlist `r(varlist)' {
+    count if `var' == 0
+    display "`var' has " r(N) " zeros"
+}
+
+
+
